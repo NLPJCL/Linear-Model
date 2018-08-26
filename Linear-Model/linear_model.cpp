@@ -1,23 +1,23 @@
 #include "linear_model.h"
 //实例化特征
-vector<string> linear_model::create_feature(sentence sentence, int pos,string tag)
+vector<string> linear_model::create_feature(sentence sentence, int pos, string tag)
 {
 	string word = sentence.word[pos];//当前词。
 	string word_char_first = sentence.word_char[pos][0];//当前词的第一个元素。
-	string word_char_last = sentence.word_char[pos][sentence.word_char[pos].size()-1];//当前词的最后一个元素。
+	string word_char_last = sentence.word_char[pos][sentence.word_char[pos].size() - 1];//当前词的最后一个元素。
 	string word_m1;
 	string word_char_m1m1;
 	string word_p1;
 	string word_char_p1_first;
 	int word_count = sentence.word.size();//当前句的总词数。
-	if (pos == 0 )
+	if (pos == 0)
 	{
 		word_m1 = "$$";
-		word_char_m1m1= "$";
+		word_char_m1m1 = "$";
 	}
 	else
 	{
-		word_m1= sentence.word[pos - 1];
+		word_m1 = sentence.word[pos - 1];
 		word_char_m1m1 = sentence.word_char[pos - 1][(sentence.word_char[pos - 1].size() - 1)];
 	}
 	if (pos == word_count - 1)
@@ -31,20 +31,20 @@ vector<string> linear_model::create_feature(sentence sentence, int pos,string ta
 		word_char_p1_first = sentence.word_char[pos + 1][0];
 	}
 	vector<string> f;
-	f.push_back("02:" + tag + "*"+word);
+	f.push_back("02:" + tag + "*" + word);
 	f.push_back("03:" + tag + "*" + word_m1);
 	f.push_back("04:" + tag + "*" + word_p1);
-	f.push_back("05:" + tag + "*" +word_char_m1m1);
-	f.push_back("06:" + tag + "*" +word_char_p1_first);
+	f.push_back("05:" + tag + "*" + word + "*" + word_char_m1m1);
+	f.push_back("06:" + tag + "*" + word + "*" + word_char_p1_first);
 	f.push_back("07:" + tag + "*" + word_char_first);
 	f.push_back("08:" + tag + "*" + word_char_last);
 	int pos_word_len = sentence.word_char[pos].size();
-	for (int k = 1; k < pos_word_len - 2; k++)
+	for (int k = 0; k < pos_word_len - 1; k++)
 	{
 		string cik = sentence.word_char[pos][k];
 		f.push_back("09:" + tag + "*" + cik);
-		f.push_back("10:" + tag + "*" + word_char_first+"*"+cik);
-		f.push_back("11:" + tag + "*" + word_char_last+"*"+cik);
+		f.push_back("10:" + tag + "*" + word_char_first + "*" + cik);
+		f.push_back("11:" + tag + "*" + word_char_last + "*" + cik);
 		string cikp1 = sentence.word_char[pos][k + 1];
 		if (cik == cikp1)
 		{
@@ -53,9 +53,9 @@ vector<string> linear_model::create_feature(sentence sentence, int pos,string ta
 	}
 	if (pos_word_len == 1)
 	{
-		f.push_back("12:" + tag + "*" +word + "*" + word_char_m1m1+"*"+ word_char_p1_first);
+		f.push_back("12:" + tag + "*" + word + "*" + word_char_m1m1 + "*" + word_char_p1_first);
 	}
-	for (int k = 0; k <pos_word_len-1;k++)
+	for (int k = 0; k <pos_word_len; k++)
 	{
 		if (k >= 4)break;
 		string prefix, suffix;
@@ -65,14 +65,44 @@ vector<string> linear_model::create_feature(sentence sentence, int pos,string ta
 			prefix = prefix + sentence.word_char[pos][n];
 		}
 		//获取后缀。
-		for (int n = pos_word_len - k-1; n <= pos_word_len-1; n++)
+		for (int n = pos_word_len - k - 1; n <= pos_word_len - 1; n++)
 		{
 			suffix = suffix + sentence.word_char[pos][n];
 		}
 		f.push_back("14:" + tag + "*" + prefix);
-		f.push_back("14:" + tag + "*" + suffix);
+		f.push_back("15:" + tag + "*" + suffix);
 	}
 	return f;
+}
+//创建特征空间
+void linear_model::create_feature_space()
+{
+	for (auto z = train.sentences.begin(); z != train.sentences.end(); z++)
+	{
+		for (int i = 0; i < z->word.size(); i++)
+		{
+			vector <string> f;
+			f = create_feature(*z, i, z->tag[i]);
+			for (auto q = f.begin(); q != f.end(); q++)
+			{
+				if (model.find(*q) == model.end())//如果不在词性里面。
+				{
+					model[*q] = 0;
+				}
+				if (tag.find(z->tag[i]) == tag.end())
+				{
+					tag[z->tag[i]] = 0;
+				}
+				else
+				{
+					tag[z->tag[i]] = tag[z->tag[i]] + 1;
+
+				}
+			}
+		}
+	}
+	cout << "the total number of features is " << model.size() << endl;
+	cout << "the total number of tags is " << tag.size() << endl;
 }
 string linear_model::maxscore_tag(sentence  sen, int pos)
 {
@@ -117,35 +147,6 @@ double linear_model::evaluate(dataset data)
 	}
 	return (c / double(total));
 	
-}
-void linear_model::create_feature_space()
-{
-	for (auto z = train.sentences.begin(); z != train.sentences.end(); z++)
-	{
-		for (int i = 0; i < z->word.size(); i++)
-		{
-			vector <string> f;
-			f = create_feature(*z, i, z->tag[i]);
-			for (auto q = f.begin(); q != f.end(); q++)
-			{
-				if (model.find(*q) == model.end())//如果不在词性里面。
-				{
-					model[*q] = 0;
-				}
-				if (tag.find(z->tag[i]) == tag.end())
-				{
-					tag[z->tag[i]] = 0;
-				}
-				else
-				{
-					tag[z->tag[i]] = tag[z->tag[i]] + 1;
-
-				}
-			}
-		}
-	}
-	cout << "the total number of features is " << model.size() << endl;
-	cout << "the total number of tags is " <<tag.size() << endl;
 }
 void linear_model::online_training()
 {
